@@ -78,6 +78,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sncosmo-
 
+      # Dustmap (SFD) cache — same pattern. Without this, skyportal/models/
+      # obj.py triggers a ~128 MB dustmaps.sfd.fetch() at import time, which
+      # blocks tornado workers long enough that test_frontend's 180 s
+      # verify_server_availability poll gives up with HTTP 503.
+      - uses: actions/cache@v5
+        with:
+          path: patched_skyportal/persistentdata/dustmap/sfd
+          key: ${{ runner.os }}-dustmap-${{ hashFiles('skyportal/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-dustmap-
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -166,6 +177,24 @@ jobs:
         run: |
           cd patched_skyportal
           PYTHONPATH=. python tools/warm_sncosmo_cache.py || true
+
+      - name: Pre-fetch SFD dustmap
+        # skyportal/models/obj.py calls dustmaps.sfd.fetch() at import time
+        # if the SFD FITS files are missing — ~128 MB pulled over the network
+        # while tornado workers are trying to come up. Do it here instead, so
+        # the cache step above keeps it warm between runs and the app start
+        # is purely local I/O.
+        run: |
+          cd patched_skyportal
+          mkdir -p persistentdata/dustmap
+          PYTHONPATH=. python -c "
+          from dustmaps.config import config
+          config['data_dir'] = 'persistentdata/dustmap'
+          import dustmaps.sfd, os
+          required = ['sfd/SFD_dust_4096_ngp.fits', 'sfd/SFD_dust_4096_sgp.fits']
+          if any(not os.path.isfile(os.path.join('persistentdata/dustmap', f)) for f in required):
+              dustmaps.sfd.fetch()
+          " || true
 
       - name: Run icare-specific tests
         # Mirrors fritz's `./fritz test` model: only run tests that live
