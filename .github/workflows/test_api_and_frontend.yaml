@@ -204,6 +204,23 @@ jobs:
           export NPM_CONFIG_LEGACY_PEER_DEPS="true"
           make dependencies
 
+      - name: Pre-warm sncosmo bandpass cache
+        # The previous actions/cache step seeds ~/.astropy/cache/sncosmo
+        # from a prior successful run, but on a cold key (first PR run, or
+        # after a sncosmo bump) we have to populate it ourselves. SkyPortal
+        # eagerly loads every ALLOWED_BANDPASSES at module import; on a
+        # cold cache each missing bandpass blocks ~10s on astropy's
+        # urlopen, the cumulative wait keeps the tornado workers from
+        # responding before test_frontend.py's startup window expires,
+        # and the suite fails with "Could not launch server processes".
+        # The warm-up script is tolerant: individual bandpass fetches that
+        # fail (e.g. SVO has a slow moment) are skipped, since SkyPortal's
+        # photometry.py / observation_plan.py already log-and-skip them at
+        # runtime. `|| true` so even a partial warm doesn't fail the step.
+        run: |
+          cd patched_skyportal
+          PYTHONPATH=. python tools/warm_sncosmo_cache.py || true
+
       - name: Run front-end tests part 1
         if: ${{ matrix.test_subset == 'frontend_pt1' }}
         run: |
