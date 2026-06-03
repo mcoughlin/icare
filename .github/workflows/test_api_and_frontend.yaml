@@ -79,6 +79,22 @@ jobs:
             ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('package.json') }}
 
+      # Cache sncosmo bandpass downloads across runs. SkyPortal eagerly loads
+      # every ALLOWED_BANDPASSES at import time, and sncosmo fetches each
+      # bandpass's data file from the network on first use via astropy's
+      # download_file (10s timeout per bandpass). With ~30 bandpasses needing
+      # fetches, a cold cache adds ~5 minutes of urlopen timeouts during the
+      # app server's startup, which exceeds test_frontend.py's wait window
+      # and surfaces as "Could not launch server processes; terminating".
+      # SkyPortal's own CI caches the same path; mirror it here.
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.astropy/cache/sncosmo/bandpasses
+          key: ${{ runner.os }}-sncosmo-${{ hashFiles('skyportal/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sncosmo-
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
