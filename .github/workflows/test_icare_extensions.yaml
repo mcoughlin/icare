@@ -56,17 +56,12 @@ jobs:
         with:
           fetch-depth: 0
           submodules: true
-          # Pull the skyportal-data submodule's LFS payload (SFD dust maps and
-          # sncosmo SED models); bandpasses/spectra are plain git.
-          lfs: true
 
       - name: Fetch submodules
-        run: |
-          git submodule update --init --recursive
-          # Ensure the nested skyportal-data LFS payload is materialized (real
-          # FITS files, not pointers) before icare copies skyportal/ into
-          # patched_skyportal/.
-          git -C skyportal/skyportal-data lfs pull
+        # skyportal-data (SFD dust maps + sncosmo models) is vendored as plain
+        # git blobs in the submodule, so a recursive update brings the real
+        # files in before icare copies skyportal/ into patched_skyportal/.
+        run: git submodule update --init --recursive
 
       - uses: browser-actions/setup-geckodriver@latest
         with:
