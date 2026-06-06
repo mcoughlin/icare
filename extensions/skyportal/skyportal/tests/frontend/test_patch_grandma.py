@@ -1,5 +1,7 @@
-def test_patch_icare(super_admin_user, driver):
+from playwright.sync_api import expect
 
-    driver.get(f"/become_user/{super_admin_user.id}")
-    driver.get("/")
-    driver.wait_for_xpath(f'//*[contains(.,"Icare")]', timeout=20)
+
+def test_patch_icare(super_admin_user, page):
+    page.goto(f"/become_user/{super_admin_user.id}")
+    page.goto("/")
+    expect(page.locator('//*[contains(.,"Icare")]').first).to_be_visible(timeout=20000)
