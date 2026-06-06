@@ -121,6 +121,13 @@ jobs:
           cd patched_skyportal && uv sync --group dev
           echo "${{ github.workspace }}/patched_skyportal/.venv/bin" >> $GITHUB_PATH
 
+      - name: Install Playwright Firefox
+        # The frontend `page` fixture launches Playwright's bundled Firefox
+        # (p.firefox.launch()), which is separate from the apt-installed system
+        # Firefox — it must be fetched via `playwright install`.
+        run: |
+          cd patched_skyportal && .venv/bin/playwright install --with-deps firefox
+
       - name: Write SkyPortal configs
         run: |
           cd skyportal
