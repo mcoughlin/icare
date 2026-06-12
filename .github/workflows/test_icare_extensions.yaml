@@ -58,6 +58,9 @@ jobs:
           submodules: true
 
       - name: Fetch submodules
+        # skyportal-data (SFD dust maps + sncosmo models) is vendored as plain
+        # git blobs in the submodule, so a recursive update brings the real
+        # files in before icare copies skyportal/ into patched_skyportal/.
         run: git submodule update --init --recursive
 
       - uses: browser-actions/setup-geckodriver@latest
@@ -84,16 +87,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sncosmo-
 
-      # Dustmap (SFD) cache — same pattern. Without this, skyportal/models/
-      # obj.py triggers a ~128 MB dustmaps.sfd.fetch() at import time, which
-      # blocks tornado workers long enough that test_frontend's 180 s
-      # verify_server_availability poll gives up with HTTP 503.
-      - uses: actions/cache@v5
-        with:
-          path: patched_skyportal/persistentdata/dustmap/sfd
-          key: ${{ runner.os }}-dustmap-${{ hashFiles('skyportal/uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-dustmap-
+      # The SFD dust maps are now vendored in the skyportal-data submodule
+      # (misc.dustmap_folder = skyportal-data/dustmaps), materialized by the
+      # recursive submodule checkout above, so the previous ~128 MB import-time
+      # fetch and its host-side cache are no longer needed.
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -190,23 +187,9 @@ jobs:
           cd patched_skyportal
           PYTHONPATH=. timeout 120 python tools/warm_sncosmo_cache.py || true
 
-      - name: Pre-fetch SFD dustmap
-        # skyportal/models/obj.py calls dustmaps.sfd.fetch() at import time
-        # if the SFD FITS files are missing — ~128 MB pulled over the network
-        # while tornado workers are trying to come up. Do it here instead, so
-        # the cache step above keeps it warm between runs and the app start
-        # is purely local I/O.
-        run: |
-          cd patched_skyportal
-          mkdir -p persistentdata/dustmap
-          PYTHONPATH=. python -c "
-          from dustmaps.config import config
-          config['data_dir'] = 'persistentdata/dustmap'
-          import dustmaps.sfd, os
-          required = ['sfd/SFD_dust_4096_ngp.fits', 'sfd/SFD_dust_4096_sgp.fits']
-          if any(not os.path.isfile(os.path.join('persistentdata/dustmap', f)) for f in required):
-              dustmaps.sfd.fetch()
-          " || true
+      # The SFD dust maps are vendored in skyportal-data/dustmaps (copied into
+      # patched_skyportal/ by the build) and referenced via misc.dustmap_folder,
+      # so obj.py reads them locally with no import-time download.
 
       - name: Run icare-specific tests
         # Mirrors fritz's `./fritz test` model: only run tests that live
