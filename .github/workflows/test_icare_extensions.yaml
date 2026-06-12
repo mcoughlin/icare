@@ -88,9 +88,9 @@ jobs:
             ${{ runner.os }}-sncosmo-
 
       # The SFD dust maps are now vendored in the skyportal-data submodule
-      # (misc.dustmap_folder = skyportal-data/dustmaps) and pulled via LFS in
-      # the checkout above, so the previous ~128 MB import-time fetch and its
-      # host-side cache are no longer needed.
+      # (misc.dustmap_folder = skyportal-data/dustmaps), materialized by the
+      # recursive submodule checkout above, so the previous ~128 MB import-time
+      # fetch and its host-side cache are no longer needed.
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
